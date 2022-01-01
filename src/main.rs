@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 use macroquad::prelude::*;
 use std::collections::LinkedList;
 
@@ -6,6 +7,12 @@ const WINDOW_WIDTH: f32 = 720.0;
 const FIELD_CELLS: i8 = 16;
 const CELL_DIMENSION: f32 = 20.0;
 const GAME_FIELD_BORDER_WIDTH: f32 = 2.0;
+
+const BACKGROUND_COLOR: &str = "FCF0C8";
+const SNAKE_COLOR: &str = "911F27";
+const APPLE_COLOR: &str = "630A10";
+const UI_COLOR: &str = "630A10";
+
 
 fn window_conf() -> Conf {
     Conf {
@@ -16,6 +23,34 @@ fn window_conf() -> Conf {
     }
 }
 
+fn hex_to_color(hexcolor: &str) -> Color {
+    let formatted_string: &str;
+    match hexcolor.strip_suffix("#") {
+        Some(color) => {
+            if color.len() != 6 {
+                panic!("Invalid hex string");
+            }
+            formatted_string = color;
+        },
+        None => {
+            if hexcolor.len() != 6 {
+                panic!("invalid hex string");
+            }
+            formatted_string = hexcolor
+        }
+    }
+    let red = i64::from_str_radix(&formatted_string[0..2], 16).unwrap();
+    let green = i64::from_str_radix(&formatted_string[2..4], 16).unwrap();
+    let blue = i64::from_str_radix(&formatted_string[4..6], 16).unwrap();
+    let color = Color::new(
+        red as f32 / 255.0,
+        green as f32 / 255.0,
+        blue as f32 / 255.0,
+        1.0
+    );
+    color
+}
+
 struct Game {
     score: i32,
     fps: i32,
@@ -23,12 +58,20 @@ struct Game {
     apple: Point,
     current_time: f64,
     is_over: bool,
+    ui_color: Color,
+    bg_color: Color,
+    apple_color: Color,
+    snake_color: Color,
 }
 
 impl Game {
     fn new() -> Game {
         let snake = Snake::new();
         let apple = Game::spawn_apple(&snake.body);
+        let ui_color = hex_to_color(UI_COLOR);
+        let bg_color = hex_to_color(BACKGROUND_COLOR);
+        let apple_color = hex_to_color(APPLE_COLOR);
+        let snake_color = hex_to_color(SNAKE_COLOR);
 
         Game {
             score: 0,
@@ -37,6 +80,10 @@ impl Game {
             apple,
             current_time: 0.0,
             is_over: false,
+            ui_color,
+            bg_color,
+            apple_color,
+            snake_color
         }
     }
 
@@ -46,11 +93,11 @@ impl Game {
             25.0,
             25.0,
             24.0,
-            DARKGRAY,
+            self.ui_color,
         )
     }
 
-    fn draw_game_field() {
+    fn draw_game_field(&self) {
         // Left up corner of game field
         let game_field_size: f32 = FIELD_CELLS as f32 * CELL_DIMENSION;
         let left_up_corner_x: f32 = WINDOW_WIDTH / 2.0 - game_field_size / 2.0;
@@ -60,28 +107,28 @@ impl Game {
             left_up_corner_y - GAME_FIELD_BORDER_WIDTH,
             game_field_size + 2.0 * GAME_FIELD_BORDER_WIDTH,
             game_field_size + 2.0 * GAME_FIELD_BORDER_WIDTH,
-            DARKGRAY,
+            self.ui_color,
         );
         draw_rectangle(
             left_up_corner_x,
             left_up_corner_y,
             game_field_size,
             game_field_size,
-            RED,
+            self.bg_color,
         );
     }
 
-    fn draw_end_game() {
-        clear_background(RED);
-        draw_text("GAME OVER", 100.0, 100.0, 36.0, DARKGRAY);
+    fn draw_end_game(&self) {
+        clear_background(self.bg_color);
+        draw_text("GAME OVER", 100.0, 100.0, 36.0, self.ui_color);
     }
 
     fn draw_snake(&self) {
-        self.snake.draw()
+        self.snake.draw(self.snake_color)
     }
 
     fn draw_apple(&self) {
-        self.apple.draw(GREEN);
+        self.apple.draw(self.apple_color);
     }
 
     fn tick(&mut self) {
@@ -153,9 +200,9 @@ struct Snake {
 }
 
 impl Snake {
-    fn draw(&self) {
+    fn draw(&self, color: Color) {
         for point in self.body.iter() {
-            point.draw(DARKGRAY);
+            point.draw(color);
         }
     }
 
@@ -257,12 +304,13 @@ impl Snake {
 #[macroquad::main(window_conf)]
 async fn main() {
     let mut game = Game::new();
+    let bg_color = hex_to_color("FEECE9");
     loop {
         if game.is_over {
-            Game::draw_end_game();
+            game.draw_end_game();
         } else {
-            clear_background(RED);
-            Game::draw_game_field();
+            clear_background(bg_color);
+            game.draw_game_field();
             game.draw_score();
             game.draw_apple();
             game.draw_snake();
