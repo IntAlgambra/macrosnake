@@ -1,6 +1,6 @@
-#![windows_subsystem = "windows"]
+// #![windows_subsystem = "windows"]
 use macroquad::prelude::*;
-use std::collections::LinkedList;
+use std::collections::{LinkedList, VecDeque};
 
 const WINDOW_HEIGHT: f32 = 480.0;
 const WINDOW_WIDTH: f32 = 720.0;
@@ -12,6 +12,8 @@ const BACKGROUND_COLOR: &str = "FCF0C8";
 const SNAKE_COLOR: &str = "911F27";
 const APPLE_COLOR: &str = "630A10";
 const UI_COLOR: &str = "630A10";
+
+const FPS: i32 = 5;
 
 
 fn window_conf() -> Conf {
@@ -75,7 +77,7 @@ impl Game {
 
         Game {
             score: 0,
-            fps: 5,
+            fps: FPS,
             snake,
             apple,
             current_time: 0.0,
@@ -133,13 +135,14 @@ impl Game {
 
     fn tick(&mut self) {
         let current_time = get_time();
-        self.snake.turn_snake();
+        self.snake.process_commands();
         if current_time - self.current_time > (1.0 / self.fps as f64) {
             if *self.snake.head() == self.apple {
                 self.snake.is_hungry = false;
                 self.apple = Game::spawn_apple(&self.snake.body);
                 self.score += 1;
             }
+            self.snake.turn_snake();
             self.snake.move_body();
             if self.snake.check_collision() {
                 self.is_over = true;
@@ -185,7 +188,7 @@ impl Point {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum Direction {
     UP,
     RIGHT,
@@ -193,10 +196,41 @@ enum Direction {
     LEFT,
 }
 
+#[derive(Debug)]
+struct CommandsQueue {
+    queue: VecDeque<Direction>
+}
+
+impl CommandsQueue {
+    fn new() -> CommandsQueue {
+        let mut queue = VecDeque::with_capacity(2);
+        queue.push_back(Direction::RIGHT);
+        CommandsQueue {
+            queue
+        }
+    }
+    fn push_direction(&mut self, direction: Direction) {
+        if self.get_last() != direction {
+            self.queue.push_back(direction)
+        }
+    }
+    fn get_direction(&mut self) -> Direction {
+        if self.queue.len() == 1 {
+            let current_direction = self.queue.get(0).unwrap().clone();
+            return current_direction
+        }
+        self.queue.pop_front().unwrap()
+    }
+    fn get_last(&self) -> Direction {
+        return self.queue.back().unwrap().clone()
+    }
+}
+
 struct Snake {
     body: LinkedList<Point>,
-    direction: Direction,
     is_hungry: bool,
+    commands_queue: CommandsQueue,
+    direction: Direction
 }
 
 impl Snake {
@@ -229,33 +263,44 @@ impl Snake {
         }
     }
 
+    fn process_commands(&mut self) {
+        let last_command = self.commands_queue.get_last();
+        if is_key_down(KeyCode::W) && last_command != Direction::DOWN {
+            // self.direction = Direction::UP;
+            self.commands_queue.push_direction(Direction::UP);
+            return;
+        }
+        if is_key_down(KeyCode::D) && last_command != Direction::LEFT {
+            // self.direction = Direction::RIGHT;
+            self.commands_queue.push_direction(Direction::RIGHT);
+            return;
+        }
+        if is_key_down(KeyCode::A) && last_command != Direction::RIGHT {
+            // self.direction = Direction::LEFT;
+            self.commands_queue.push_direction(Direction::LEFT);
+            return;
+        }
+        if is_key_down(KeyCode::S) && last_command != Direction::UP {
+            // self.direction = Direction::DOWN;
+            self.commands_queue.push_direction(Direction::DOWN);
+            return;
+        }
+    }
+
     fn turn_snake(&mut self) {
-        if is_key_down(KeyCode::W) && self.direction != Direction::DOWN {
-            self.direction = Direction::UP;
-            return;
-        }
-        if is_key_down(KeyCode::D) && self.direction != Direction::LEFT {
-            self.direction = Direction::RIGHT;
-            return;
-        }
-        if is_key_down(KeyCode::A) && self.direction != Direction::RIGHT {
-            self.direction = Direction::LEFT;
-            return;
-        }
-        if is_key_down(KeyCode::S) && self.direction != Direction::UP {
-            self.direction = Direction::DOWN;
-            return;
-        }
+        self.direction = self.commands_queue.get_direction();
     }
 
     fn new() -> Snake {
         let initial_point = Point::new(5, 5);
         let second_point = Point::new(5, 6);
         let body = LinkedList::from([initial_point, second_point]);
+        let commands = CommandsQueue::new();
         Snake {
             body,
-            direction: Direction::RIGHT,
             is_hungry: true,
+            commands_queue: commands,
+            direction: Direction::RIGHT
         }
     }
 
