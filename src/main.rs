@@ -1,4 +1,5 @@
 // #![windows_subsystem = "windows"]
+use macroquad::audio::{load_sound, play_sound, play_sound_once, Sound};
 use macroquad::prelude::*;
 use std::collections::{LinkedList, VecDeque};
 
@@ -14,7 +15,6 @@ const APPLE_COLOR: &str = "630A10";
 const UI_COLOR: &str = "630A10";
 
 const FPS: i32 = 5;
-
 
 fn window_conf() -> Conf {
     Conf {
@@ -33,7 +33,7 @@ fn hex_to_color(hexcolor: &str) -> Color {
                 panic!("Invalid hex string");
             }
             formatted_string = color;
-        },
+        }
         None => {
             if hexcolor.len() != 6 {
                 panic!("invalid hex string");
@@ -48,7 +48,7 @@ fn hex_to_color(hexcolor: &str) -> Color {
         red as f32 / 255.0,
         green as f32 / 255.0,
         blue as f32 / 255.0,
-        1.0
+        1.0,
     );
     color
 }
@@ -64,10 +64,11 @@ struct Game {
     bg_color: Color,
     apple_color: Color,
     snake_color: Color,
+    apple_sound: Sound,
 }
 
 impl Game {
-    fn new() -> Game {
+    fn new(apple_sound: Sound) -> Game {
         let snake = Snake::new();
         let apple = Game::spawn_apple(&snake.body);
         let ui_color = hex_to_color(UI_COLOR);
@@ -85,7 +86,8 @@ impl Game {
             ui_color,
             bg_color,
             apple_color,
-            snake_color
+            snake_color,
+            apple_sound,
         }
     }
 
@@ -122,7 +124,13 @@ impl Game {
 
     fn draw_end_game(&self) {
         clear_background(self.bg_color);
-        draw_text("GAME OVER", 100.0, 100.0, 36.0, self.ui_color);
+        draw_text(
+            "GAME OVER. \n Press Enter to rty again!",
+            100.0,
+            100.0,
+            36.0,
+            self.ui_color,
+        );
     }
 
     fn draw_snake(&self) {
@@ -138,6 +146,7 @@ impl Game {
         self.snake.process_commands();
         if current_time - self.current_time > (1.0 / self.fps as f64) {
             if *self.snake.head() == self.apple {
+                play_sound_once(self.apple_sound);
                 self.snake.is_hungry = false;
                 self.apple = Game::spawn_apple(&self.snake.body);
                 self.score += 1;
@@ -167,8 +176,7 @@ impl Game {
     }
 }
 
-#[derive(PartialEq)]
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 struct Point {
     x: i32,
     y: i32,
@@ -198,16 +206,14 @@ enum Direction {
 
 #[derive(Debug)]
 struct CommandsQueue {
-    queue: VecDeque<Direction>
+    queue: VecDeque<Direction>,
 }
 
 impl CommandsQueue {
     fn new() -> CommandsQueue {
         let mut queue = VecDeque::with_capacity(2);
         queue.push_back(Direction::RIGHT);
-        CommandsQueue {
-            queue
-        }
+        CommandsQueue { queue }
     }
     fn push_direction(&mut self, direction: Direction) {
         if self.get_last() != direction {
@@ -217,12 +223,12 @@ impl CommandsQueue {
     fn get_direction(&mut self) -> Direction {
         if self.queue.len() == 1 {
             let current_direction = self.queue.get(0).unwrap().clone();
-            return current_direction
+            return current_direction;
         }
         self.queue.pop_front().unwrap()
     }
     fn get_last(&self) -> Direction {
-        return self.queue.back().unwrap().clone()
+        return self.queue.back().unwrap().clone();
     }
 }
 
@@ -230,7 +236,7 @@ struct Snake {
     body: LinkedList<Point>,
     is_hungry: bool,
     commands_queue: CommandsQueue,
-    direction: Direction
+    direction: Direction,
 }
 
 impl Snake {
@@ -300,7 +306,7 @@ impl Snake {
             body,
             is_hungry: true,
             commands_queue: commands,
-            direction: Direction::RIGHT
+            direction: Direction::RIGHT,
         }
     }
 
@@ -348,11 +354,17 @@ impl Snake {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let mut game = Game::new();
+    let apple_sound = load_sound("assets/mixkit-small-hit-in-a-game-2072.wav")
+        .await
+        .unwrap();
+    let mut game = Game::new(apple_sound);
     let bg_color = hex_to_color("FEECE9");
     loop {
         if game.is_over {
             game.draw_end_game();
+            if is_key_down(KeyCode::Enter) {
+                game = Game::new(apple_sound);
+            }
         } else {
             clear_background(bg_color);
             game.draw_game_field();
