@@ -1,5 +1,5 @@
 // #![windows_subsystem = "windows"]
-use macroquad::audio::{load_sound, play_sound, play_sound_once, Sound};
+use macroquad::audio::{load_sound, play_sound_once, Sound};
 use macroquad::prelude::*;
 use std::collections::{LinkedList, VecDeque};
 
